@@ -21,7 +21,7 @@ logger.add(
     str(log_file_path),
     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
     level="DEBUG",
-    rotation="10 MB",
+    rotation="00:00",
     retention="14 days",
     encoding="utf-8",
 )

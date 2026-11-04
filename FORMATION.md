@@ -805,8 +805,8 @@ curl -X POST http://127.0.0.1:8000/chat \
 ## 🐳 Phase 7 : Conteneurisation Docker
 
 ### Ce qui a été fait
-- `backend/Dockerfile` : `python:3.11-slim`, `pip install -e .` (installation *editable* car `config.py` calcule `BASE_DIR` depuis l'emplacement du package pour retrouver `models/` et `logs/`), téléchargement de `vader_lexicon` **au build** (`NLTK_DATA=/usr/local/share/nltk_data`), copie de `models/` et `backend/`.
-- `frontend/Dockerfile` : `python:3.11-slim`, uniquement `streamlit` + `requests`, copie de `frontend/`.
+- `backend/Dockerfile` : `python:3.12-slim` (version imposée par le brief), `pip install -e .` (installation *editable* car `config.py` calcule `BASE_DIR` depuis l'emplacement du package pour retrouver `models/` et `logs/`), téléchargement de `vader_lexicon` **au build** (`NLTK_DATA=/usr/local/share/nltk_data`), copie de `models/` et `backend/`.
+- `frontend/Dockerfile` : `python:3.12-slim`, uniquement `streamlit` + `requests`, copie de `frontend/`.
 - `.dockerignore` : exclut `.venv`, `.git`, `logs`, `docs`, `tests`, caches.
 - Pas de `CMD` : les commandes de démarrage sont déjà définies dans `docker-compose.yml`.
 
@@ -832,6 +832,10 @@ curl -X POST http://127.0.0.1:8000/chat \
 - **BuildKit** exécute les `docker build` / `docker compose build` (lecture des Dockerfiles, cache des couches) ; **buildx** est le plugin CLI qui le pilote.
 - Il est créé automatiquement au premier build avec le driver `docker-container` et conserve le cache de build.
 - Inoffensif : on peut le laisser. `docker rm -f buildx_buildkit_default` le supprime (recréé au prochain build, cache perdu). `docker compose down` ne l'arrête pas.
+
+### Revue de conformité au brief
+- **Python 3.12** : les Dockerfiles étaient en 3.11, alignés sur 3.12 (stack du brief).
+- **Rotation quotidienne des logs** : `logger.py` (fichier fourni) avait `rotation="10 MB"` malgré son commentaire « quotidienne » ; passé à `rotation="00:00"` (rotation à minuit) pour respecter le critère « rotation quotidienne ».
 
 ### Pièges rencontrés
 - Le `uvicorn` lancé en local occupait le port 8000 : il faut l'arrêter avant `docker compose up`.
