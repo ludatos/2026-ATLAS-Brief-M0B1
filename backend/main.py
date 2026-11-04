@@ -35,15 +35,15 @@ sentiment_analyzer: SentimentAnalyzer = None
 async def lifespan(app: FastAPI):
     """Cycle de vie de l'application FastAPI.
     
-    TODO (Apprenants) :
-    1. Instancier le CreditScoringPredictor() et l'assigner a la variable globale scoring_predictor.
-    2. Instancier le SentimentAnalyzer() et l'assigner a la variable globale sentiment_analyzer.
-    3. Logger le succes de l'initialisation avec loguru.
+    Initialise les modeles ML au demarrage et les libere a l'arret.
     """
     global scoring_predictor, sentiment_analyzer
     logger.info("Demarrage des services FastAPI IA-TOS...")
     
-    # TODO: Initialisez vos modeles ici
+    # Initialiser les modeles une seule fois
+    scoring_predictor = CreditScoringPredictor()
+    sentiment_analyzer = SentimentAnalyzer()
+    logger.success("Services initialises : CreditScoringPredictor + SentimentAnalyzer")
     
     yield
     logger.info("Arret des services FastAPI IA-TOS.")
@@ -71,16 +71,13 @@ app.add_middleware(
 def health_check():
     """Endpoint de surveillance (Healthcheck) pour Uptime Kuma ou Docker.
     
-    TODO (Apprenants) :
-    Retourner une instance de HealthResponse avec :
-    - status="ok"
-    - version=__version__
-    - service="iatos-api"
+    Returns:
+        HealthResponse avec status, version et service.
     """
-    # TODO: Remplacer par votre implementation
-    raise HTTPException(
-        status_code=501, 
-        detail="Endpoint /health non implemente. A vous de jouer !"
+    return HealthResponse(
+        status="ok",
+        version=__version__,
+        service="iatos-api"
     )
 
 
@@ -99,41 +96,162 @@ def chat_endpoint(payload: ChatRequest):
     4. Gerer les exceptions potentielles avec un logger.error et un HTTPException(500).
     """
     # TODO: Remplacer par votre implementation
-    raise HTTPException(
-        status_code=501, 
-        detail="Endpoint /chat non implemente. A vous de jouer !"
-    )
+    try:
+        history_dicts = []
+        for msg in payload.history:
+            history_dicts.append({
+                "role": msg.role,
+                "content": msg.content
+            })
+
+        logger.info(
+            "Message recu: {msg}, historique: {n} messages",
+            msg=payload.message,
+            n=len(history_dicts)
+        )
+        agent_result = run_agent_message(
+            user_message=payload.message,
+            history=history_dicts
+        )
+        logger.info(
+            "Agent response: success={s}, tool_called={t}",
+            s=agent_result["success"],
+            t=agent_result["tool_called"]
+        )
+
+        return ChatResponse(
+            success=agent_result["success"],
+            response=agent_result["response"],
+            tool_called=agent_result["tool_called"],
+            tool_results=agent_result["tool_results"]
+        )
+    except Exception as e:
+        logger.error(
+            "Erreur dans /chat endpoint: {error_type} - {error_msg}",
+            error_type=type(e).__name__,
+            error_msg=str(e)
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur serveur : {str(e)}"
+        )
 
 
 @app.post("/predict/credit", response_model=CreditPredictResponse, tags=["Scoring Tabulaire"])
 def predict_credit(payload: CreditPredictRequest):
     """Endpoint de prediction du score de credit (baseline Scikit-Learn M0).
     
-    TODO (Apprenants) :
-    1. Recuperer l'instance globale de scoring_predictor (ou l'instancier si None).
-    2. Appeler scoring_predictor.predict(...) avec montant_demande, duree_mois et revenu_mensuel.
-    3. Retourner une instance de CreditPredictResponse avec les resultats.
-    4. Gerer les exceptions potentielles avec un HTTPException(500).
+    Args:
+        payload: CreditPredictRequest contenant montant, duree et revenu
+        
+    Returns:
+        CreditPredictResponse avec score, decision, motif et metadonnees
+        
+    Raises:
+        HTTPException(500): En cas d'erreur serveur
     """
-    # TODO: Remplacer par votre implementation
-    raise HTTPException(
-        status_code=501, 
-        detail="Endpoint /predict/credit non implemente. A vous de jouer !"
-    )
+    try:
+        global scoring_predictor
+        
+        # ÉTAPE 1: Vérifier que le prédicteur est chargé
+        if scoring_predictor is None:
+            logger.warning("scoring_predictor non charge, initialisation...")
+            scoring_predictor = CreditScoringPredictor()
+        
+        logger.info(
+            "Requete scoring credit : montant={m}E, duree={d}m, revenu={r}E",
+            m=payload.montant_demande,
+            d=payload.duree_mois,
+            r=payload.revenu_mensuel
+        )
+        
+        # ÉTAPE 2: Appeler le prédicteur avec les paramètres du payload
+        result = scoring_predictor.predict(
+            montant_demande=payload.montant_demande,
+            duree_mois=payload.duree_mois,
+            revenu_mensuel=payload.revenu_mensuel
+        )
+        
+        # ÉTAPE 3: Construire et retourner la réponse Pydantic
+        logger.info(
+            "Scoring termine : score={s}, decision={d}",
+            s=result["score"],
+            d=result["decision"]
+        )
+        
+        return CreditPredictResponse(
+            score=result["score"],
+            decision=result["decision"],
+            motif=result["motif"],
+            features_utilisees=result["features_utilisees"],
+            type_modele=result["type_modele"]
+        )
+    
+    except Exception as exc:
+        # ÉTAPE 4: Gerer les exceptions
+        logger.error(
+            "Erreur dans /predict/credit endpoint: {error_type} - {error_msg}",
+            error_type=type(exc).__name__,
+            error_msg=str(exc)
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur serveur lors du scoring de credit : {str(exc)}"
+        )
 
 
 @app.post("/predict/sentiment", response_model=SentimentPredictResponse, tags=["Traitement NLP"])
 def predict_sentiment(payload: SentimentPredictRequest):
     """Endpoint d'analyse de polarite de sentiment (baseline NLTK VADER M0).
     
-    TODO (Apprenants) :
-    1. Recuperer l'instance globale de sentiment_analyzer (ou l'instancier si None).
-    2. Appeler sentiment_analyzer.analyze(payload.texte).
-    3. Retourner une instance de SentimentPredictResponse avec les resultats.
-    4. Gerer les exceptions potentielles avec un HTTPException(500).
+    Args:
+        payload: SentimentPredictRequest contenant le texte a analyser
+        
+    Returns:
+        SentimentPredictResponse avec compound, label, scores et metadonnees
+        
+    Raises:
+        HTTPException(500): En cas d'erreur serveur
     """
-    # TODO: Remplacer par votre implementation
-    raise HTTPException(
-        status_code=501, 
-        detail="Endpoint /predict/sentiment non implemente. A vous de jouer !"
-    )
+    try:
+        global sentiment_analyzer
+        
+        # ÉTAPE 1: Vérifier que l'analyseur est chargé
+        if sentiment_analyzer is None:
+            logger.warning("sentiment_analyzer non charge, initialisation...")
+            sentiment_analyzer = SentimentAnalyzer()
+        
+        logger.info(
+            "Requete analyse sentiment : texte='{t}...'",
+            t=payload.texte[:50]
+        )
+        
+        # ÉTAPE 2: Appeler l'analyseur avec le texte du payload
+        result = sentiment_analyzer.analyze(payload.texte)
+        
+        # ÉTAPE 3: Construire et retourner la réponse Pydantic
+        logger.info(
+            "Analyse terminee : label={l}, compound={c}",
+            l=result["label"],
+            c=result["compound"]
+        )
+        
+        return SentimentPredictResponse(
+            texte=result["texte"],
+            compound=result["compound"],
+            label=result["label"],
+            scores=result["scores"],
+            type_modele=result["type_modele"]
+        )
+    
+    except Exception as exc:
+        # ÉTAPE 4: Gerer les exceptions
+        logger.error(
+            "Erreur dans /predict/sentiment endpoint: {error_type} - {error_msg}",
+            error_type=type(exc).__name__,
+            error_msg=str(exc)
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur serveur lors de l'analyse de sentiment : {str(exc)}"
+        )

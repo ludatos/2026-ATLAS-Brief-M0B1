@@ -68,4 +68,73 @@ et connecte au LLM local **Qwen 2.5** via **Ollama**. Il possede un outil determ
 #    e. Si tool_called est True, afficher un expander montrant les calculs effectués.
 # ==============================================================================
 
-st.info("A vous de jouer ! Implementez la logique de chat conversationnelle ci-dessous.")
+# Initialiser le session state pour l'historique des messages
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Afficher les messages existants
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+        
+        # Si un outil a été appelé, afficher la trace technique
+        if message.get("tool_called") and message.get("tool_results"):
+            with st.expander("🔧 Trace technique"):
+                for tool_result in message["tool_results"]:
+                    st.code(tool_result, language="text")
+
+# Récupérer la saisie utilisateur
+user_input = st.chat_input("Posez une question ou demandez un calcul...")
+
+if user_input:
+    # Ajouter le message utilisateur au session state et l'afficher
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+    
+    # Préparer l'historique pour l'API (convertir en dicts)
+    history_payload = [
+        {"role": msg["role"], "content": msg["content"]}
+        for msg in st.session_state.messages[:-1]  # Exclure le dernier message qu'on vient d'ajouter
+    ]
+    
+    # Appeler l'endpoint /chat du backend
+    try:
+        with st.spinner("L'agent réfléchit..."):
+            response = requests.post(
+                f"{FASTAPI_URL}/chat",
+                json={
+                    "message": user_input,
+                    "history": history_payload
+                },
+                timeout=30
+            )
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Ajouter la réponse au session state
+            message_data = {
+                "role": "assistant",
+                "content": data["response"],
+                "tool_called": data.get("tool_called", False),
+                "tool_results": data.get("tool_results", [])
+            }
+            st.session_state.messages.append(message_data)
+            
+            # Afficher la réponse
+            with st.chat_message("assistant"):
+                st.markdown(data["response"])
+                
+                # Si un outil a été appelé, afficher l'expander avec la trace
+                if data.get("tool_called") and data.get("tool_results"):
+                    with st.expander("🔧 Trace technique"):
+                        for tool_result in data["tool_results"]:
+                            st.code(tool_result, language="text")
+        else:
+            st.error(f"Erreur API : {response.status_code} - {response.text}")
+    
+    except requests.exceptions.Timeout:
+        st.error("Timeout : L'agent a pris trop de temps à répondre.")
+    except Exception as e:
+        st.error(f"Erreur de connexion au backend : {str(e)}")
