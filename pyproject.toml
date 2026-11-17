@@ -13,7 +13,7 @@ dependencies = [
     "fastapi>=0.110.0",
     "uvicorn>=0.28.0",
     "pydantic>=2.6.0",
-    "streamlit>=1.32.0",
+    "streamlit>=1.49,<2",
     "scikit-learn>=1.4.0",
     "pandas>=2.2.0",
     "numpy>=1.26.0",
@@ -26,6 +26,10 @@ dependencies = [
     "langchain-ollama>=0.1.0",
     "requests>=2.31.0",
     "pytest>=9.2.0",
+    "transformers>=4.45,<5",
+    "torch>=2.6,<3",
+    "pillow>=10.3",
+    "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]
@@ -40,3 +44,13 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "src"]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

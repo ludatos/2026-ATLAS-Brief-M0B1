@@ -7,13 +7,21 @@ Vous devez completer les routes ci-dessous en vous appuyant sur :
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from typing import Annotated
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 
 from iatos_core import __version__
 from iatos_core.logger import logger
 from iatos_core.ml.scoring import CreditScoringPredictor
 from iatos_core.ml.sentiment import SentimentAnalyzer
+from iatos_core.ml.vision import (
+    DEFAULT_LABELS,
+    MAX_IMAGE_BYTES,
+    DocumentClassifier,
+    InvalidDocumentError,
+)
 from iatos_core.agent.graph import run_agent_message
 
 from backend.schemas import (
@@ -21,6 +29,7 @@ from backend.schemas import (
     ChatResponse,
     CreditPredictRequest,
     CreditPredictResponse,
+    DocumentClassificationResponse,
     HealthResponse,
     SentimentPredictRequest,
     SentimentPredictResponse,
@@ -29,6 +38,7 @@ from backend.schemas import (
 # Services partages (Singletons en memoire)
 scoring_predictor: CreditScoringPredictor = None
 sentiment_analyzer: SentimentAnalyzer = None
+document_classifier: DocumentClassifier | None = None
 
 
 @asynccontextmanager
@@ -37,22 +47,26 @@ async def lifespan(app: FastAPI):
     
     Initialise les modeles ML au demarrage et les libere a l'arret.
     """
-    global scoring_predictor, sentiment_analyzer
+    global scoring_predictor, sentiment_analyzer, document_classifier
     logger.info("Demarrage des services FastAPI IA-TOS...")
     
     # Initialiser les modeles une seule fois
     scoring_predictor = CreditScoringPredictor()
     sentiment_analyzer = SentimentAnalyzer()
-    logger.success("Services initialises : CreditScoringPredictor + SentimentAnalyzer")
+    document_classifier = DocumentClassifier()
+    logger.success("Services initialises : credit, sentiment et vision CLIP")
     
-    yield
-    logger.info("Arret des services FastAPI IA-TOS.")
+    try:
+        yield
+    finally:
+        document_classifier = None
+        logger.info("Arret des services FastAPI IA-TOS.")
 
 
 # Instanciation de l'application FastAPI
 app = FastAPI(
     title="Plateforme IA-TOS - API Multi-Services",
-    description="API exposant l'agent conversationnel LangGraph, le scoring de credit et l'analyse de sentiment.",
+    description="API exposant le chatbot, le scoring de credit, le sentiment et la classification de documents CLIP.",
     version=__version__,
     lifespan=lifespan,
 )
@@ -79,6 +93,51 @@ def health_check():
         version=__version__,
         service="iatos-api"
     )
+
+
+@app.post(
+    "/vision/classify-document",
+    response_model=DocumentClassificationResponse,
+    tags=["Vision CLIP"],
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "multipart/form-data": {
+                    "encoding": {"labels": {"style": "form", "explode": True}},
+                },
+            },
+        },
+    },
+)
+async def classify_document(
+    file: Annotated[UploadFile, File(description="Image JPEG ou PNG, 5 Mio maximum")],
+    labels: Annotated[
+        list[str] | None, Form(min_length=2, max_length=20, description="Categories candidates distinctes")
+    ] = None,
+) -> DocumentClassificationResponse:
+    """Classe une image parmi les libelles, sans verifier son authenticite."""
+    try:
+        if document_classifier is None:
+            raise HTTPException(status_code=503, detail="Le service vision n'est pas disponible.")
+        content = await file.read(MAX_IMAGE_BYTES + 1)
+        candidates = await run_in_threadpool(
+            document_classifier.classify, content, labels if labels is not None else list(DEFAULT_LABELS),
+        )
+        return DocumentClassificationResponse(
+            filename=file.filename or "image",
+            detected_document=candidates[0]["label"],
+            confidence=candidates[0]["score"],
+            candidates=candidates,
+        )
+    except InvalidDocumentError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except (RuntimeError, OSError, ValueError, IndexError, KeyError, TypeError):
+        logger.exception("Echec de la classification CLIP")
+        raise HTTPException(status_code=500, detail="Erreur interne de classification.") from None
+    finally:
+        await file.close()
 
 
 @app.post("/chat", response_model=ChatResponse, tags=["Agent Conversationnel"])

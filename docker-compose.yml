@@ -12,8 +12,10 @@ services:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
       - OLLAMA_MODEL=qwen2.5:7b
       - API_PORT=8000
+      - HF_HOME=/app/.cache/huggingface
     volumes:
       - ./logs:/app/logs
+      - huggingface_cache:/app/.cache/huggingface
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -30,3 +32,6 @@ services:
       - FASTAPI_BACKEND_URL=http://backend:8000
     depends_on:
       - backend
+
+volumes:
+  huggingface_cache:

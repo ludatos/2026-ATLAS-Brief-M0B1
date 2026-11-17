@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
@@ -19,5 +20,12 @@ from backend.main import app
 @pytest.fixture(scope="session")
 def client():
     """Fixture retournant un client de test FastAPI."""
-    with TestClient(app) as test_client:
-        yield test_client
+    with patch("iatos_core.ml.vision.pipeline") as load_pipeline:
+        load_pipeline.return_value.return_value = [
+            {"label": "blank paper", "score": 0.7},
+            {"label": "bank statement", "score": 0.15},
+            {"label": "identity card", "score": 0.1},
+            {"label": "bank check", "score": 0.05},
+        ]
+        with TestClient(app) as test_client:
+            yield test_client
