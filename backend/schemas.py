@@ -55,3 +55,15 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     service: str
+
+
+class DocumentClassScore(BaseModel):
+    label: str = Field(..., min_length=1)
+    score: float = Field(..., ge=0.0, le=1.0)
+
+
+class DocumentClassificationResponse(BaseModel):
+    filename: str
+    detected_document: str
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    candidates: list[DocumentClassScore] = Field(..., min_length=2)

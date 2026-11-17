@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Le frontend n'a besoin que de streamlit et requests (il appelle le backend en HTTP)
-RUN pip install streamlit requests
+RUN pip install "streamlit>=1.49,<2" requests
 
 COPY frontend ./frontend
 
