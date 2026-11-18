@@ -1,0 +1,183 @@
+<!doctype html><html lang="fr"><meta charset="utf-8"><title>Synthèse scoring ML</title><style>body{font:11px Arial;max-width:1000px;margin:20px auto}table{border-collapse:collapse;font-size:10px}td,th{padding:3px;border:1px solid #ccc}@page{size:A4;margin:12mm}h1{font-size:18px}</style><p># Synthèse — Optimisation du scoring IA-TOS</p><p>Protocole : 960 dossiers train, 240 test ; cinq plis stratifiés sur la décision ; graine 42.</p><p>Données train : 0 valeurs manquantes ; refus : 62.3%. Aucune ligne supprimée.</p><p>Variables métier : reste à vivre hors intérêts et ratio épargne/emprunt ; exclusion des deux cibles, de l’identifiant et des attributs socio-démographiques listés au départ.</p><p>Régression retenue : Optuna GradientBoosting, variables métier=False.</p><p>Classification retenue : Optuna GradientBoosting, variables métier=False.</p><p>Budget Optuna : 20 essais par défi, sélection exclusivement sur CV.</p><p>Test final : erreur absolue moyenne 28.9 points ; rappel des refus 86.7%.</p><p>Compromis : 20 refus historiques acceptés à tort et 24 accords refusés à tort. Les coûts ne sont pas chiffrés sans hypothèses métier.</p><p>Limites : petit dataset synthétique, sélection CV optimiste après essais multiples, absence de validation temporelle/externe. Les décisions historiques ne mesurent pas directement les défauts de paiement.</p><p>Équité : exclure des attributs ne supprime pas les biais ou les proxys. Une analyse par groupes et une validation réglementaire restent nécessaires avant tout usage réel.</p><table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>defi</th>
+      <th>famille</th>
+      <th>variables_metier</th>
+      <th>etape</th>
+      <th>r2</th>
+      <th>mae</th>
+      <th>rmse</th>
+      <th>roc_auc</th>
+      <th>rappel_refus</th>
+      <th>f1_refus</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>regression</td>
+      <td>Dummy</td>
+      <td>False</td>
+      <td>baseline</td>
+      <td>-0.002 +/- 0.002</td>
+      <td>50.464 +/- 2.894</td>
+      <td>63.301 +/- 3.445</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>regression</td>
+      <td>RandomForest</td>
+      <td>False</td>
+      <td>baseline</td>
+      <td>0.617 +/- 0.051</td>
+      <td>31.599 +/- 1.554</td>
+      <td>38.960 +/- 1.719</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>regression</td>
+      <td>RandomForest</td>
+      <td>True</td>
+      <td>baseline</td>
+      <td>0.612 +/- 0.058</td>
+      <td>31.709 +/- 1.723</td>
+      <td>39.157 +/- 1.717</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>regression</td>
+      <td>GradientBoosting</td>
+      <td>False</td>
+      <td>baseline</td>
+      <td>0.626 +/- 0.039</td>
+      <td>31.028 +/- 0.846</td>
+      <td>38.552 +/- 1.527</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>regression</td>
+      <td>GradientBoosting</td>
+      <td>True</td>
+      <td>baseline</td>
+      <td>0.625 +/- 0.050</td>
+      <td>30.954 +/- 1.214</td>
+      <td>38.526 +/- 1.630</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>classification</td>
+      <td>Dummy</td>
+      <td>False</td>
+      <td>baseline</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>0.500 +/- 0.000</td>
+      <td>1.000 +/- 0.000</td>
+      <td>0.768 +/- 0.002</td>
+    </tr>
+    <tr>
+      <td>classification</td>
+      <td>RandomForest</td>
+      <td>False</td>
+      <td>baseline</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>0.874 +/- 0.015</td>
+      <td>0.865 +/- 0.055</td>
+      <td>0.839 +/- 0.021</td>
+    </tr>
+    <tr>
+      <td>classification</td>
+      <td>RandomForest</td>
+      <td>True</td>
+      <td>baseline</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>0.872 +/- 0.016</td>
+      <td>0.851 +/- 0.032</td>
+      <td>0.828 +/- 0.007</td>
+    </tr>
+    <tr>
+      <td>classification</td>
+      <td>GradientBoosting</td>
+      <td>False</td>
+      <td>baseline</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>0.877 +/- 0.008</td>
+      <td>0.848 +/- 0.049</td>
+      <td>0.833 +/- 0.024</td>
+    </tr>
+    <tr>
+      <td>classification</td>
+      <td>GradientBoosting</td>
+      <td>True</td>
+      <td>baseline</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>0.871 +/- 0.011</td>
+      <td>0.850 +/- 0.042</td>
+      <td>0.832 +/- 0.014</td>
+    </tr>
+    <tr>
+      <td>regression</td>
+      <td>GradientBoosting</td>
+      <td>False</td>
+      <td>optuna</td>
+      <td>0.650 +/- 0.038</td>
+      <td>29.857 +/- 1.226</td>
+      <td>37.285 +/- 1.833</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>classification</td>
+      <td>GradientBoosting</td>
+      <td>False</td>
+      <td>optuna</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>0.891 +/- 0.016</td>
+      <td>0.880 +/- 0.041</td>
+      <td>0.851 +/- 0.022</td>
+    </tr>
+  </tbody>
+</table><h2>Test final</h2><table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>R²</th>
+      <th>MAE</th>
+      <th>RMSE</th>
+      <th>ROC-AUC</th>
+      <th>Rappel refus</th>
+      <th>F1 refus</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0.647</td>
+      <td>28.929</td>
+      <td>37.499</td>
+      <td>0.887</td>
+      <td>0.867</td>
+      <td>0.855</td>
+    </tr>
+  </tbody>
+</table></html>

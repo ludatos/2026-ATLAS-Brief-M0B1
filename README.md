@@ -4,6 +4,29 @@ Bienvenue dans le starter kit du **Brief 1 - Module 0 (Socle Applicatif & Micros
 
 ---
 
+## Brief 3 - Optimisation du scoring ML
+
+Le [notebook d'expérimentation](notebooks/03_Optimisation_Scoring_ML.ipynb) contient
+le diagnostic, les variables métier, les références naïves, Random Forest,
+Gradient Boosting, la validation à cinq plis et deux études Optuna de 20 essais.
+La sélection utilise uniquement le train ; le test final est évalué ensuite.
+L'exécution complète exporte les deux pipelines dans `models/` et une
+[synthèse imprimable](notebooks/synthese_scoring_ml.html).
+Les fonctions partagées sont dans `src/iatos_core/ml/credit_training.py` pour
+permettre le rechargement joblib depuis un processus neuf.
+
+```powershell
+uv sync --extra dev --extra ml
+```
+
+Ouvrir le notebook dans VS Code et sélectionner le noyau Python de `.venv`
+(Python 3.12 attendu par le brief). Le notebook utilise le CSV de `data/` et
+ne remplace pas le modèle de l'application existante.
+
+Tests ciblés : `uv run pytest tests/test_credit_training.py -q`.
+
+---
+
 ## 1. Contexte du Projet
 
 L'entreprise **TOS** modernise son architecture décisionnelle et opérationnelle à travers la création d'une plateforme unifiée d'intelligence artificielle : **IA-TOS**.
